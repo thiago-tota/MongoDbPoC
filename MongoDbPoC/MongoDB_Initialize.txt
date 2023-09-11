@@ -1,0 +1,1 @@
+﻿docker run -d --name MongoDbService -p 3017:27017 -e MONGO_INITDB_DATABASE=MongoDbLab mongo
