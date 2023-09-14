@@ -1,61 +1,81 @@
-﻿using System.Collections;
-using MongoDB.Bson;
+﻿using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 
 namespace MongoDbPoC
 {
-    internal class MongoDbRepository
+    internal abstract class MongoDbRepository<TDto>
     {
-        const string _mondoDbUrl = "mongodb://localhost:3017";
-        const string _mongoDatabaseName = "MongoDbLab";
-        const string _mongoCollectionName = "MyDtoCollection";
+        private readonly string _host;
+        private readonly string _databaseName;
+        private readonly string _collectionName;
 
-        readonly MongoClient _mongoClient;
-        readonly IMongoDatabase _mongoDatabase;
-        readonly IMongoCollection<BsonDocument> _mongoCollection;
+        private readonly MongoClient _client;
+        private readonly IMongoDatabase _database;
+        private readonly IMongoCollection<BsonDocument> _collection;
 
-        public MongoDbRepository()
+        public abstract Dictionary<string, string> Indexes { get; }
+
+        public MongoDbRepository(string host, string database, string collection)
         {
-            _mongoClient = new MongoClient(_mondoDbUrl);
-            _mongoDatabase = _mongoClient.GetDatabase(_mongoDatabaseName);
-            _mongoCollection = _mongoDatabase.GetCollection<BsonDocument>(_mongoCollectionName);
+            _host = host;
+            _databaseName = database;
+            _collectionName = collection;
+
+            _client = new MongoClient(_host);
+            _database = _client.GetDatabase(_databaseName);
+            _collection = _database.GetCollection<BsonDocument>(_collectionName);
         }
 
-        public async Task CheckIndexes()
+        public virtual async Task CheckIndexes()
         {
-            var indexes = new Dictionary<string, string>
-            {
-                { "Locator", "LocatorAscIndex" },
-                { "Name", "NameAscIndex" },
-                { "DateOfBirth", "DateOfBirthAscIndex" },
-                { "IsActive", "IsActiveAscIndex" }
-            };
+            var existingIndexes = (await _collection.Indexes.ListAsync()).ToList();
 
-            var existingIndexes = (await _mongoCollection.Indexes.ListAsync()).ToList();
-
-            foreach (var item in indexes)
+            foreach (var item in Indexes)
             {
                 if (!existingIndexes.Any(f => f["key"].AsBsonDocument.Contains(item.Key)))
                 {
                     var indexKey = Builders<BsonDocument>.IndexKeys.Ascending(item.Key);
                     var indexModel = new CreateIndexModel<BsonDocument>(indexKey, new CreateIndexOptions { Name = item.Value });
-                    await _mongoCollection.Indexes.CreateOneAsync(indexModel);
+                    await _collection.Indexes.CreateOneAsync(indexModel);
                 }
             }
         }
 
-        public void Save(List<MyDTO> records)
+        public virtual async Task CreateAsync(TDto document)
         {
-            var bsonDocuments = records.Select(r => r.ToBsonDocument());
-            _mongoCollection.InsertMany(bsonDocuments);
+            await _collection.InsertOneAsync(document.ToBsonDocument());
         }
 
-        public List<MyDTO>? SearchByField(string field, int value)
+        public virtual void Save(List<TDto> records)
+        {
+            var bsonDocuments = records.Select(r => r.ToBsonDocument());
+            _collection.InsertMany(bsonDocuments);
+        }
+
+        public virtual List<TDto>? SearchByField(string field, int value)
         {
             var filter = Builders<BsonDocument>.Filter.Eq(field, value);
-            var result = _mongoCollection.Find(filter).ToList();
-            return result.Select(r => BsonSerializer.Deserialize<MyDTO>(r)).ToList();
+            var result = _collection.Find(filter).ToList();
+            return result.Select(r => BsonSerializer.Deserialize<TDto>(r)).ToList();
+        }
+
+        public virtual async Task<List<TDto>> ReadAllAsync()
+        {
+            var result = await _collection.Find(_ => true).ToListAsync();
+            return result.Select(r => BsonSerializer.Deserialize<TDto>(r)).ToList();
+        }
+
+        public virtual async Task UpdateAsync(string id, TDto document)
+        {
+            var filter = Builders<BsonDocument>.Filter.Eq("_id", id);
+            await _collection.ReplaceOneAsync(filter, document.ToBsonDocument());
+        }
+
+        public virtual async Task DeleteAsync(string id)
+        {
+            var filter = Builders<BsonDocument>.Filter.Eq("_id", id);
+            await _collection.DeleteOneAsync(filter);
         }
     }
 }

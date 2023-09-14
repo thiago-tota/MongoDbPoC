@@ -2,7 +2,7 @@
 
 namespace MongoDbPoC
 {
-    internal class MyDTO
+    internal class MyDto
     {
         public Guid Id { get; set; }
         public int Locator { get; set; }
@@ -22,14 +22,14 @@ namespace MongoDbPoC
         [JsonIgnore]
         public string JsonObject { get; set; } = string.Empty;
 
-        public static List<MyDTO> GenerateRandomDTOs(int quantity)
+        public static List<MyDto> GenerateRandomDTOs(int quantity)
         {
             var random = new Random();
-            var dtos = new List<MyDTO>();
+            var dtos = new List<MyDto>();
 
             for (int i = 0; i < quantity; i++)
             {
-                var dto = new MyDTO
+                var dto = new MyDto
                 {
                     Id = Guid.NewGuid(),
                     Locator = random.Next(1000000, 9999999),

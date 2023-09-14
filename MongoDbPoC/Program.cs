@@ -10,8 +10,8 @@ namespace MongoDbPoC
             var totalRecords = 1000;
 
             Console.WriteLine("Welcome to MongoDb PoC!");
-            var records = MyDTO.GenerateRandomDTOs(totalRecords);
-            var repo = new MongoDbRepository();
+            var records = MyDto.GenerateRandomDTOs(totalRecords);
+            var repo = new MyDtoRepository();
 
             Console.WriteLine($"Checking database indexes");
             stopwatch.Restart();
