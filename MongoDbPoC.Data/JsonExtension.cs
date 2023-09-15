@@ -1,9 +1,9 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace MongoDbPoC
+namespace MongoDbPoC.Data
 {
-    internal static class JsonExtension
+    public static class JsonExtension
     {
         public static string ToJson<TValue>(this TValue value, JsonSerializerOptions? jsonSerializerOptions = null)
         {

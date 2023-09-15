@@ -1,8 +1,8 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace MongoDbPoC
+namespace MongoDbPoC.Data
 {
-    internal class MyDto
+    public class MyDto
     {
         public Guid Id { get; set; }
         public int Locator { get; set; }
@@ -21,6 +21,15 @@ namespace MongoDbPoC
 
         [JsonIgnore]
         public string JsonObject { get; set; } = string.Empty;
+
+        public static string GetCollectionName => "MyDtoCollection";
+        public static Dictionary<string, string> GetIndexes => new()
+        {
+            { "Locator", "LocatorAscIndex" },
+            { "Name", "NameAscIndex" },
+            { "DateOfBirth", "DateOfBirthAscIndex" },
+            { "IsActive", "IsActiveAscIndex" }
+        };
 
         public static List<MyDto> GenerateRandomDTOs(int quantity)
         {
