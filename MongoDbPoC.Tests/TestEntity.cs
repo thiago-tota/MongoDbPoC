@@ -1,8 +1,10 @@
 ﻿using System.Text.Json.Serialization;
+using MongoDbPoC.Data;
+using MongoDbPoC.Data.Entities;
 
-namespace MongoDbPoC.Data
+namespace MongoDbPoC.Tests
 {
-    public class MyDto
+    public class TestEntity : IEntity
     {
         public Guid Id { get; set; }
         public int Locator { get; set; }
@@ -31,14 +33,14 @@ namespace MongoDbPoC.Data
             { "IsActive", "IsActiveAscIndex" }
         };
 
-        public static List<MyDto> GenerateRandomDTOs(int quantity)
+        public static List<TestEntity> GenerateRandomDTOs(int quantity)
         {
             var random = new Random();
-            var dtos = new List<MyDto>();
+            var dtos = new List<TestEntity>();
 
             for (int i = 0; i < quantity; i++)
             {
-                var dto = new MyDto
+                var dto = new TestEntity
                 {
                     Id = Guid.NewGuid(),
                     Locator = random.Next(1000000, 9999999),

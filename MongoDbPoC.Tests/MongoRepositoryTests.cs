@@ -1,46 +1,47 @@
+using System.Linq.Expressions;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
-using MongoDbPoC.Data;
+using MongoDB.Driver;
 using MongoDbPoC.Data.Repository;
 
 namespace MongoDbPoC.Tests
 {
-    public class MongoRepositoryTests
+    public class MongoRepositoryTests : IClassFixture<MongoRepositoryFixture>
     {
-        private readonly IMongoRepository<MyDto> _repository;
+        private readonly IMongoRepository<TestEntity> _repository;
 
-        public MongoRepositoryTests()
+        public MongoRepositoryTests(MongoRepositoryFixture mongoRepositoryFixture)
         {
-            var configuration = new ConfigurationBuilder()
-               .SetBasePath(Directory.GetCurrentDirectory())
-               .AddJsonFile("appsettings.json")
-               .Build();
+            var configuration = mongoRepositoryFixture.GetConfiguration();
 
-            var host = configuration.GetSection("MongoSettings").GetSection("MongoDBHost").Value;
-            var dbName = configuration.GetSection("MongoSettings").GetSection("MongoDBName").Value;
+            var host = configuration.GetSection("MongoSettings").GetSection("Host").Value;
+            var databaseName = configuration.GetSection("MongoSettings").GetSection("DatabaseName").Value;
 
-            _repository = new MongoRepository<MyDto>(host!, dbName!, MyDto.GetCollectionName, MyDto.GetIndexes);
+            _repository = new MongoRepository<TestEntity>(host!, databaseName!, TestEntity.GetCollectionName, TestEntity.GetIndexes);
+            mongoRepositoryFixture.ResetDb(host!, databaseName!, TestEntity.GetCollectionName);
         }
 
         [Fact]
         public async Task CreateMany()
         {
-            var records = MyDto.GenerateRandomDTOs(1000);
+            var records = TestEntity.GenerateRandomDTOs(1000);
             await _repository.CreateAsync(records);
         }
 
         [Fact]
         public async Task CreateOne()
         {
-            var dto = MyDto.GenerateRandomDTOs(1).First();
+            var dto = TestEntity.GenerateRandomDTOs(1).First();
             await _repository.CreateAsync(dto);
         }
 
         [Fact]
         public async Task GetAll()
         {
+            await CreateMany();
+            await Task.Delay(200);
+
             var response = await _repository.GetAllAsync();
-            response.Should().HaveCountGreaterThanOrEqualTo(1);
+            response.Should().HaveCountGreaterThanOrEqualTo(1000);
         }
 
         [Fact]
@@ -62,8 +63,13 @@ namespace MongoDbPoC.Tests
             await Task.Delay(200);
 
             var value = record.GetType().GetProperty(field)?.GetValue(record);
+            var param = Expression.Parameter(typeof(TestEntity), "name");
+            var prop = Expression.Property(param, field);
+            var constant = Expression.Constant(value);
+            var equal = Expression.Equal(prop, constant);
+            var lambda = Expression.Lambda<Func<TestEntity, bool>>(equal, param);
 
-            var response = await _repository.GetByFieldAsync(field, value!);
+            var response = await _repository.GetByFieldAsync(lambda);
 
             response.Should().NotBeNull();
             response.Should().HaveCountGreaterThan(0);
@@ -96,9 +102,9 @@ namespace MongoDbPoC.Tests
             response.Should().BeGreaterThan(0);
         }
 
-        private async Task<MyDto> CreateNewRecord()
+        private async Task<TestEntity> CreateNewRecord()
         {
-            var record = MyDto.GenerateRandomDTOs(1).Single();
+            var record = TestEntity.GenerateRandomDTOs(1).Single();
             await _repository.CreateAsync(record);
 
             return record;

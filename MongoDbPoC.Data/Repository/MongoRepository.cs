@@ -1,23 +1,23 @@
-﻿using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
+﻿using System.Linq.Expressions;
 using MongoDB.Driver;
+using MongoDbPoC.Data.Entities;
 
 namespace MongoDbPoC.Data.Repository
 {
-    public class MongoRepository<T> : IMongoRepository<T> where T : class
+    public class MongoRepository<T> : IMongoRepository<T> where T : IEntity
     {
         private readonly Dictionary<string, string> _indexes;
 
         private readonly MongoClient _client;
         private readonly IMongoDatabase _database;
-        private readonly IMongoCollection<BsonDocument> _collection;
+        private readonly IMongoCollection<T> _collection;
 
         public MongoRepository(string host, string database, string collection, Dictionary<string, string> indexes)
         {
             _indexes = indexes;
             _client = new MongoClient(host);
             _database = _client.GetDatabase(database);
-            _collection = _database.GetCollection<BsonDocument>(collection);
+            _collection = _database.GetCollection<T>(collection);
         }
 
         public async Task CheckIndexes()
@@ -28,8 +28,8 @@ namespace MongoDbPoC.Data.Repository
             {
                 if (!existingIndexes.Any(f => f["key"].AsBsonDocument.Contains(item.Key)))
                 {
-                    var indexKey = Builders<BsonDocument>.IndexKeys.Ascending(item.Key);
-                    var indexModel = new CreateIndexModel<BsonDocument>(indexKey, new CreateIndexOptions { Name = item.Value });
+                    var indexKey = Builders<T>.IndexKeys.Ascending(item.Key);
+                    var indexModel = new CreateIndexModel<T>(indexKey, new CreateIndexOptions { Name = item.Value });
                     await _collection.Indexes.CreateOneAsync(indexModel);
                 }
             }
@@ -37,44 +37,39 @@ namespace MongoDbPoC.Data.Repository
 
         public async Task<IEnumerable<T>> GetAllAsync()
         {
-            var result = await _collection.Find(_ => true).ToListAsync();
-            return result.Select(f => BsonSerializer.Deserialize<T>(f));
+            return await _collection.Find(_ => true).ToListAsync();
         }
 
         public async Task<T> GetByIdAsync(Guid id)
         {
-            return (await GetByFieldAsync("_id", id)).FirstOrDefault()!;
+            return (await GetByFieldAsync(f => f.Id == id)).FirstOrDefault()!;
         }
 
-        public async Task<IEnumerable<T>> GetByFieldAsync(string field, object value)
+        public async Task<IEnumerable<T>> GetByFieldAsync(Expression<Func<T, bool>> predicate)
         {
-            var filter = Builders<BsonDocument>.Filter.Eq(field, value);
-            var result = await _collection.Find(filter).ToListAsync();
-            return result.Select(r => BsonSerializer.Deserialize<T>(r)).ToList();
+            return await _collection.Find(predicate).ToListAsync();
         }
 
         public async Task CreateAsync(T entity)
         {
-            await _collection.InsertOneAsync(entity.ToBsonDocument());
+            await _collection.InsertOneAsync(entity);
         }
 
         public async Task CreateAsync(IEnumerable<T> entities)
         {
-            var documents = entities.Select(r => r.ToBsonDocument());
+            var documents = entities.Select(r => r);
             await _collection.InsertManyAsync(documents);
         }
 
         public async Task<long> UpdateAsync(Guid id, T entity)
         {
-            var filter = Builders<BsonDocument>.Filter.Eq("_id", id);
-            var result = await _collection.ReplaceOneAsync(filter, entity.ToBsonDocument());
+            var result = await _collection.ReplaceOneAsync(f => f.Id == id, entity);
             return result.ModifiedCount;
         }
 
         public async Task<long> DeleteAsync(Guid id)
         {
-            var filter = Builders<BsonDocument>.Filter.Eq("_id", id);
-            var result = await _collection.DeleteOneAsync(filter);
+            var result = await _collection.DeleteOneAsync(f => f.Id == id);
             return result.DeletedCount;
         }
     }
