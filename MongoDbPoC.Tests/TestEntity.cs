@@ -4,7 +4,7 @@ using MongoDbPoC.Data.Entities;
 
 namespace MongoDbPoC.Tests
 {
-    public class TestEntity : IEntity
+    public record TestEntity : BaseEntity, IEntity
     {
         public Guid Id { get; set; }
         public int Locator { get; set; }
